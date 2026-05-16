@@ -1,7 +1,7 @@
 {
   "name": "novaa-bot",
   "version": "1.0.0",
-  "description": "Novaa Advanced Dual-Mode Discord Bot",
+  "description": "Novaa Advanced 100 Commands Discord Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
