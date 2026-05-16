@@ -178,7 +178,7 @@ client.on('interactionCreate', async (interaction) => {
         const trigger = options.getString('status');
         if (trigger === 'enable') {
             const dbData = await Config.findOne({ guildId });
-            if (!dbData || !dbData.dbData.quarantineRoleId) return interaction.reply({ content: '⚠️ Setup quarantine role first using `/setquarantine`', ephemeral: true });
+            if (!dbData || !dbData.quarantineRoleId) return interaction.reply({ content: '⚠️ Setup quarantine role first using `/setquarantine`', ephemeral: true });
             dbData.antinukeEnabled = true; 
             await dbData.save();
             return interaction.reply('✅ **Novaa Routing:** Action routing for **antinuke** verified. Security Grid is now **ACTIVE**.');
