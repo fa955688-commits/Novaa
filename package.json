@@ -1,0 +1,13 @@
+{
+  "name": "novaa-bot",
+  "version": "1.0.0",
+  "description": "Novaa Advanced Dual-Mode Discord Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "mongoose": "^8.2.0"
+  }
+}
