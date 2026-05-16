@@ -1,5 +1,18 @@
 const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, ApplicationCommandOptionType } = require('discord.js');
 const mongoose = require('mongoose');
+const express = require('express');
+
+// Express App to bypass Render Port Binding Error
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    res.send('Novaa Core Engine is running 24/7 stable!');
+});
+
+app.listen(PORT, () => {
+    console.log(`Web server listening on port ${PORT} to bypass Render grid restriction.`);
+});
 
 const client = new Client({
     intents: [
@@ -52,7 +65,7 @@ const safeSlashCommands = [
 // Deploy Safe Slash Registry on Ready
 client.once('ready', async () => {
     console.log(`Novaa Engine Core Active. Logged in as ${client.user.tag}`);
-    client.user.setActivity('over 100+ Core Commands', { type: 3 });
+    client.user.setActivity('over Aetherion Grid', { type: 3 });
 
     try {
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -65,7 +78,7 @@ client.once('ready', async () => {
 });
 
 // Core Dynamic Router
-async function runSystemModule(name, ctx, isSlash = false) {
+async function runSystemModule(name, ctx) {
     const cmd = name.toLowerCase();
 
     if (cmd === 'help') {
@@ -143,7 +156,7 @@ client.on('messageCreate', async (message) => {
         } catch (e) { return message.reply('❌ Access denied. Check role hierarchy rules.'); }
     }
 
-    await runSystemModule(command, message, false);
+    await runSystemModule(command, message);
 });
 
 // ==================== SLASH ENGINE ====================
@@ -165,7 +178,7 @@ client.on('interactionCreate', async (interaction) => {
         const trigger = options.getString('status');
         if (trigger === 'enable') {
             const dbData = await Config.findOne({ guildId });
-            if (!dbData || !dbData.quarantineRoleId) return interaction.reply({ content: '⚠️ Setup quarantine role first using `/setquarantine`', ephemeral: true });
+            if (!dbData || !dbData.dbData.quarantineRoleId) return interaction.reply({ content: '⚠️ Setup quarantine role first using `/setquarantine`', ephemeral: true });
             dbData.antinukeEnabled = true; 
             await dbData.save();
             return interaction.reply('✅ **Novaa Routing:** Action routing for **antinuke** verified. Security Grid is now **ACTIVE**.');
@@ -175,7 +188,7 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
-    await runSystemModule(commandName, interaction, true);
+    await runSystemModule(commandName, interaction);
 });
 
 // Safe Boot Mongoose
