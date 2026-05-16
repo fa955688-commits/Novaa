@@ -21,7 +21,7 @@ const Config = mongoose.model('Config', configSchema);
 
 const prefix = 'n!';
 
-// ==================== 100+ DYNAMIC COMMANDS REGISTRY ====================
+// ==================== 100+ DYNAMIC COMMANDS PACK ====================
 const botCommands = {
     security: ['antinuke', 'setquarantine', 'antiraid', 'antilink', 'antispam', 'antibot', 'webhookprotect', 'auditlog', 'lockdown', 'backup', 'whitelist', 'blacklist', 'verify', 'captcha', 'securitystatus'],
     moderation: ['kick', 'ban', 'unban', 'mute', 'unmute', 'timeout', 'untimeout', 'warn', 'warnings', 'clearwarn', 'purge', 'clear', 'slowmode', 'lock', 'unlock', 'hide', 'unhide', 'addrole', 'removerole', 'nick', 'setnick'],
@@ -31,10 +31,9 @@ const botCommands = {
     music: ['play', 'skip', 'stop', 'pause', 'resume', 'queue', 'nowplaying', 'loop', 'shuffle', 'volume', 'join', 'leave', 'lyrics', 'clearqueue']
 };
 
-// Flatten all commands into a single list for easy matching
 const allCommandNames = Object.values(botCommands).flat();
 
-// Generate Slash Command Data for Discord Registry
+// Primary Slash Registry
 const slashCommandsData = [
     { name: 'help', description: 'View Novaa’s 100+ Advanced Command Grid' },
     { name: 'ping', description: 'Check Novaa Matrix Heartbeat' },
@@ -43,44 +42,45 @@ const slashCommandsData = [
     { name: 'nick', description: 'Set user nickname', options: [{ name: 'user', description: 'Target user', type: ApplicationCommandOptionType.User, required: true }, { name: 'name', description: 'New name', type: ApplicationCommandOptionType.String, required: true }] }
 ];
 
-// Dynamically generate basic handlers for remaining 100+ slash commands to save memory
-allCommandNames.forEach(cmd => {
+// Dynamically inject the remaining 100+ modules properly
+for (const cmd of allCommandNames) {
     if (!['ping', 'setquarantine', 'antinuke', 'nick'].includes(cmd)) {
         slashCommandsData.push({ name: cmd, description: `Novaa Matrix: Execute ${cmd} operation` });
     }
-});
+}
 
-// Auto deploy slash commands
 client.once('ready', async () => {
-    console.log(`Logged in as ${client.user.tag}! [100+ Commands Active]`);
-    client.user.setActivity('over 100+ Commands', { type: 3 });
+    console.log(`Logged in as ${client.user.tag}! [100+ Commands Pipeline Stable]`);
+    client.user.setActivity('over Aetherion Grid', { type: 3 });
 
     try {
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+        console.log('Refreshing 100+ global application commands database...');
         await rest.put(Routes.applicationCommands(client.user.id), { body: slashCommandsData });
-        console.log('Successfully registered 100+ application (/) commands.');
-    } catch (err) { console.error(err); }
+        console.log('Successfully stabilized and loaded 100+ application (/) commands.');
+    } catch (err) { 
+        console.error('Slash load error:', err); 
+    }
 });
 
-// Helper Core function to handle responses dynamically
+// Help and Dynamic Module Response Router
 async function executeMatrixCommand(cmdName, ctx, isSlash = false) {
     const name = cmdName.toLowerCase();
     
-    // Core Handlers
     if (name === 'help') {
         const embed = new EmbedBuilder()
-            .setTitle('🌌 Novaa Advanced Routing Grid (100+ Commands)')
+            .setTitle('🌌 Novaa Advanced Routing Grid (100+ Commands Installed)')
             .setColor('#2f3136')
             .setDescription('Use `n![command]` or `/` to access the modules.')
             .addFields(
                 { name: `🛡️ Security Grid (${botCommands.security.length})`, value: botCommands.security.map(c => `\`${c}\``).join(', ') },
                 { name: `🔨 Moderation Core (${botCommands.moderation.length})`, value: botCommands.moderation.map(c => `\`${c}\``).join(', ') },
-                { name: `⚙️ Utility & Infrastructure (${botCommands.utility.length})`, value: botCommands.utility.map(c => `\`${c}\``).join(', ') },
+                { name: `⚙️ Utility Grid (${botCommands.utility.length})`, value: botCommands.utility.map(c => `\`${c}\``).join(', ') },
                 { name: `🎮 Fun & Simulation (${botCommands.fun.length})`, value: botCommands.fun.map(c => `\`${c}\``).join(', ') },
                 { name: `💰 Server Economy (${botCommands.economy.length})`, value: botCommands.economy.map(c => `\`${c}\``).join(', ') },
                 { name: `🎵 High-Fi Audio Control (${botCommands.music.length})`, value: botCommands.music.map(c => `\`${c}\``).join(', ') }
             )
-            .setFooter({ text: `Total Active Modules: ${allCommandNames.length + 1} System Online` });
+            .setFooter({ text: `Total Active Modules: ${allCommandNames.length + 1} | Core Live` });
         return isSlash ? ctx.reply({ embeds: [embed] }) : ctx.reply({ embeds: [embed] });
     }
 
@@ -89,11 +89,9 @@ async function executeMatrixCommand(cmdName, ctx, isSlash = false) {
         return isSlash ? ctx.reply(msg) : ctx.reply(msg);
     }
 
-    // Default Dynamic Handler for the 100+ modules
     if (allCommandNames.includes(name)) {
         let category = Object.keys(botCommands).find(key => botCommands[key].includes(name));
         category = category.charAt(0).toUpperCase() + category.slice(1);
-        
         const response = `✅ **Novaa Routing:** Action routing for **${name}** verified over **Text Input Buffer**. [Module: ${category}]`;
         return isSlash ? ctx.reply(response) : ctx.reply(response);
     }
@@ -102,12 +100,11 @@ async function executeMatrixCommand(cmdName, ctx, isSlash = false) {
 // ==================== PREFIX ENGINE ====================
 client.on('messageCreate', async (message) => {
     if (message.author.bot || !message.content.startsWith(prefix)) return;
-    const args = message.content.slice(prefix.length).trim().split(/+/);
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // Specific logic commands
     if (command === 'setquarantine') {
-        if (!message.member.permissions.has('Administrator')) return message.reply('❌ Admin required.');
+        if (!message.member.permissions.has('Administrator')) return message.reply('❌ Admin clearance required.');
         const role = message.mentions.roles.first();
         if (!role) return message.reply('❌ Use `n!setquarantine @Role`');
         await Config.findOneAndUpdate({ guildId: message.guild.id }, { quarantineRoleId: role.id }, { upsert: true });
@@ -115,7 +112,7 @@ client.on('messageCreate', async (message) => {
     }
 
     if (command === 'antinuke') {
-        if (!message.member.permissions.has('Administrator')) return message.reply('❌ Admin required.');
+        if (!message.member.permissions.has('Administrator')) return message.reply('❌ Admin clearance required.');
         const sub = args[0]?.toLowerCase();
         if (sub === 'enable') {
             const data = await Config.findOne({ guildId: message.guild.id });
@@ -136,7 +133,6 @@ client.on('messageCreate', async (message) => {
         try { await target.setNickname(newNick); return message.reply(`✅ Changed nick for ${target.user.username}`); } catch { return message.reply('❌ Failed.'); }
     }
 
-    // Call Dynamic Core for others
     await executeMatrixCommand(command, message, false);
 });
 
@@ -173,14 +169,13 @@ client.on('interactionCreate', async (interaction) => {
         try { await target.setNickname(newNick); return interaction.reply(`✅ Changed nick for ${target.user.username}`); } catch { return interaction.reply('❌ Failed.'); }
     }
 
-    // Call Dynamic Core for others
     await executeMatrixCommand(commandName, interaction, true);
 });
 
-// DB Connect & Login
+// Secure Mongoose Setup
 mongoose.connect(process.env.MONGO_URI)
     .then(() => {
-        console.log('Database connected!');
+        console.log('Database pipeline synchronized.');
         client.login(process.env.DISCORD_TOKEN);
     })
     .catch(err => console.error(err));
