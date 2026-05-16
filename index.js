@@ -1,18 +1,12 @@
-const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, ApplicationCommandOptionType } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, ApplicationCommandOptionType, PermissionFlagsBits } = require('discord.js');
 const mongoose = require('mongoose');
 const express = require('express');
 
 // Express App to bypass Render Port Binding Error
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-    res.send('Novaa Core Engine is running 24/7 stable!');
-});
-
-app.listen(PORT, () => {
-    console.log(`Web server listening on port ${PORT} to bypass Render grid restriction.`);
-});
+app.get('/', (req, res) => res.send('Novaa Anti-Nuke Engine Operational.'));
+app.listen(PORT, () => console.log(`Web server listening on port ${PORT}`));
 
 const client = new Client({
     intents: [
@@ -20,35 +14,45 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences
+        GatewayIntentBits.GuildModeration
     ]
 });
 
-// MongoDB Schema Setup
+// MongoDB Schema Setup with Punishment Option
 const configSchema = new mongoose.Schema({
     guildId: { type: String, required: true, unique: true },
     quarantineRoleId: { type: String, default: null },
-    antinukeEnabled: { type: Boolean, default: false }
+    antinukeEnabled: { type: Boolean, default: false },
+    antispamEnabled: { type: Boolean, default: false },
+    antilinkEnabled: { type: Boolean, default: false },
+    punishment: { type: String, default: 'ban' } // Default punishment is ban
 });
 const Config = mongoose.model('Config', configSchema);
 
 const prefix = 'n!';
 
-// ==================== ALL 100+ PREFIX COMMANDS LIST ====================
-const botCommands = {
-    security: ['antinuke', 'setquarantine', 'antiraid', 'antilink', 'antispam', 'antibot', 'webhookprotect', 'auditlog', 'lockdown', 'backup', 'whitelist', 'blacklist', 'verify', 'captcha', 'securitystatus'],
-    moderation: ['kick', 'ban', 'unban', 'mute', 'unmute', 'timeout', 'untimeout', 'warn', 'warnings', 'clearwarn', 'purge', 'clear', 'slowmode', 'lock', 'unlock', 'hide', 'unhide', 'addrole', 'removerole', 'nick', 'setnick'],
-    utility: ['ping', 'stats', 'serverinfo', 'userinfo', 'avatar', 'banner', 'roles', 'emojis', 'invite', 'uptime', 'botinfo', 'channelinfo', 'membercount', 'search', 'math', 'weather', 'translate', 'poll', 'reminder', 'clock'],
-    fun: ['meme', 'joke', 'coinflip', 'roll', 'dice', '8ball', 'ascii', 'say', 'embed', 'hack', 'slap', 'hug', 'kill', 'punch', 'kiss', 'pat', 'wink', 'dance', 'cuddle', 'clown', 'roast', 'quote', 'trivia', 'rps'],
-    economy: ['balance', 'daily', 'beg', 'work', 'gamble', 'slots', 'rob', 'deposit', 'withdraw', 'shop', 'buy', 'sell', 'inventory', 'leaderboard', 'pay'],
-    music: ['play', 'skip', 'stop', 'pause', 'resume', 'queue', 'nowplaying', 'loop', 'shuffle', 'volume', 'join', 'leave', 'lyrics', 'clearqueue']
-};
+// Anti-Spam Cache
+const messageCache = new Map();
 
-const allCommandNames = Object.values(botCommands).flat();
+// Helper Function to Execute Punishment
+async function executePunishment(guild, member, db) {
+    if (!member) return;
+    const method = db.punishment || 'ban';
+    const reason = 'Novaa Anti-Nuke: Unauthorized Server Modification Detected.';
 
-// Safe Slash Commands Registry (Strictly under Discord's 100 limit)
+    if (method === 'ban') {
+        await member.ban({ reason }).catch(() => null);
+    } else if (method === 'kick') {
+        await member.kick(reason).catch(() => null);
+    } else if (method === 'quarantine' && db.quarantineRoleId) {
+        // Strip all current roles and add quarantine role
+        await member.roles.set([db.quarantineRoleId], reason).catch(() => null);
+    }
+}
+
+// Updated Slash Commands Registry (Strictly under Discord's 100 limit)
 const safeSlashCommands = [
-    { name: 'help', description: 'View Novaa’s 100+ Advanced Command Grid' },
+    { name: 'help', description: 'View Novaa’s Advanced Command Grid' },
     { name: 'ping', description: 'Check Novaa Matrix Latency Network' },
     { 
         name: 'setquarantine', 
@@ -59,136 +63,223 @@ const safeSlashCommands = [
         name: 'antinuke', 
         description: 'Toggle server security matrix', 
         options: [{ name: 'status', description: 'Enable or disable antinuke', type: ApplicationCommandOptionType.String, required: true, choices: [{ name: 'Enable', value: 'enable' }, { name: 'Disable', value: 'disable' }] }] 
+    },
+    {
+        name: 'setpunishment',
+        description: 'Set Anti-Nuke action (Ban, Kick, or Quarantine)',
+        options: [{
+            name: 'type',
+            description: 'Choose the punishment type',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            choices: [
+                { name: 'Direct Ban', value: 'ban' },
+                { name: 'Direct Kick', value: 'kick' },
+                { name: 'Quarantine Role', value: 'quarantine' }
+            ]
+        }]
     }
 ];
 
-// Deploy Safe Slash Registry on Ready
 client.once('ready', async () => {
     console.log(`Novaa Engine Core Active. Logged in as ${client.user.tag}`);
-    client.user.setActivity('over Aetherion Grid', { type: 3 });
-
     try {
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         console.log('Synchronizing safe core application commands...');
         await rest.put(Routes.applicationCommands(client.user.id), { body: safeSlashCommands });
         console.log('Successfully stabilized and reloaded application commands.');
-    } catch (err) {
-        console.error('Failed system deployment:', err);
+    } catch (err) { console.error(err); }
+});
+
+// ==================== ANTI-NUKE CORE WITH DYNAMIC PUNISHMENT ====================
+
+// 1. Channel Delete Trigger
+client.on('channelDelete', async (channel) => {
+    const db = await Config.findOne({ guildId: channel.guild.id });
+    if (!db || !db.antinukeEnabled) return;
+
+    const auditLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: 12 });
+    const logEntry = auditLogs.entries.first();
+    if (!logEntry) return;
+
+    const { executor } = logEntry;
+    if (executor.id === client.user.id || executor.id === channel.guild.ownerId) return;
+
+    const member = await channel.guild.members.fetch(executor.id).catch(() => null);
+    if (member) {
+        await executePunishment(channel.guild, member, db);
+        
+        // Restore channel backup
+        await channel.guild.channels.create({
+            name: channel.name,
+            type: channel.type,
+            parent: channel.parentId,
+            permissionOverwrites: channel.permissionOverwrites.cache.map(p => p)
+        }).catch(() => null);
     }
 });
 
-// Core Dynamic Router
-async function runSystemModule(name, ctx) {
-    const cmd = name.toLowerCase();
+// 2. Role Delete Trigger
+client.on('roleDelete', async (role) => {
+    const db = await Config.findOne({ guildId: role.guild.id });
+    if (!db || !db.antinukeEnabled) return;
 
-    if (cmd === 'help') {
-        const helpEmbed = new EmbedBuilder()
-            .setTitle('🌌 Novaa Advanced Routing Grid (100+ Commands Active)')
-            .setColor('#2f3136')
-            .setDescription('System core is monitoring active networks. Prefix: `n!` (All 100+) & Slash: `/` (Core Commands):')
-            .addFields(
-                { name: `🛡️ Security Matrix (${botCommands.security.length} modules)`, value: botCommands.security.map(c => `\`${c}\``).join(', ') },
-                { name: `🔨 Moderation Core (${botCommands.moderation.length} modules)`, value: botCommands.moderation.map(c => `\`${c}\``).join(', ') },
-                { name: `⚙️ Utility Grid (${botCommands.utility.length} modules)`, value: botCommands.utility.map(c => `\`${c}\``).join(', ') },
-                { name: `🎮 Simulation & Fun (${botCommands.fun.length} modules)`, value: botCommands.fun.map(c => `\`${c}\``).join(', ') },
-                { name: `💰 Economy Database (${botCommands.economy.length} modules)`, value: botCommands.economy.map(c => `\`${c}\``).join(', ') },
-                { name: `🎵 High-Fi Audio Module (${botCommands.music.length} modules)`, value: botCommands.music.map(c => `\`${c}\``).join(', ') }
-            )
-            .setFooter({ text: `Total Active Modules: ${allCommandNames.length + 1} | System Stable` });
+    const auditLogs = await role.guild.fetchAuditLogs({ limit: 1, type: 32 });
+    const logEntry = auditLogs.entries.first();
+    if (!logEntry) return;
 
-        return ctx.reply({ embeds: [helpEmbed] });
+    const { executor } = logEntry;
+    if (executor.id === client.user.id || executor.id === role.guild.ownerId) return;
+
+    const member = await role.guild.members.fetch(executor.id).catch(() => null);
+    if (member) {
+        await executePunishment(role.guild, member, db);
     }
+});
 
-    if (cmd === 'ping') {
-        const speed = `Calling Novaa Routing Matrix... Heartbeat stable at **${client.ws.ping}ms**.`;
-        return ctx.reply(speed);
-    }
-
-    // Dynamic Engine Response for all 100+ modules via prefix
-    if (allCommandNames.includes(cmd)) {
-        let moduleCategory = Object.keys(botCommands).find(key => botCommands[key].includes(cmd));
-        moduleCategory = moduleCategory.charAt(0).toUpperCase() + moduleCategory.slice(1);
-        const dynamicMsg = `✅ **Novaa Routing:** Action routing for **${cmd}** verified over **Text Input Buffer**. [Module: ${moduleCategory}]`;
-        return ctx.reply(dynamicMsg);
-    }
-}
-
-// ==================== PREFIX ENGINE ====================
+// ==================== CHAT GUARD AND PREFIX COMMANDS ====================
 client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.content.startsWith(prefix)) return;
+    if (message.author.bot || !message.guild) return;
 
+    const db = await Config.findOne({ guildId: message.guild.id });
+    if (!db) return;
+
+    // Anti-Link Core Action
+    if (db.antilinkEnabled && (message.content.includes('discord.gg/') || message.content.includes('http://') || message.content.includes('https://'))) {
+        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            await message.delete().catch(() => null);
+            return message.channel.send(`⚠️ **${message.author.username}**, এই সার্ভারে লিংক শেয়ার করা নিষেধ!`).then(m => setTimeout(() => m.delete(), 4000));
+        }
+    }
+
+    // Anti-Spam Core Action
+    if (db.antispamEnabled && !message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        const now = Date.now();
+        const userData = messageCache.get(message.author.id) || { timestamps: [], content: '' };
+        
+        if (userData.content === message.content) userData.timestamps.push(now);
+        else { userData.timestamps = [now]; userData.content = message.content; }
+        
+        userData.timestamps = userData.timestamps.filter(ts => now - ts < 5000);
+        messageCache.set(message.author.id, userData);
+
+        if (userData.timestamps.length >= 4) {
+            await message.delete().catch(() => null);
+            if (db.quarantineRoleId) {
+                await message.member.roles.add(db.quarantineRoleId).catch(() => null);
+                return message.channel.send(`🚨 **${message.author.username}** কে স্প্যাম করার জন্য কোয়ারেন্টাইন করা হলো!`);
+            }
+        }
+    }
+
+    // Prefix Command Check
+    if (!message.content.startsWith(prefix)) return;
     const args = message.content.slice(prefix.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
+    if (command === 'setpunishment') {
+        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return message.reply('❌ Admin required.');
+        const type = args[0]?.toLowerCase();
+        
+        if (!['ban', 'kick', 'quarantine'].includes(type)) {
+            return message.reply('❌ **ভুল মেথড!** ব্যবহার করুন: `n!setpunishment ban/kick/quarantine`');
+        }
+
+        if (type === 'quarantine' && !db.quarantineRoleId) {
+            return message.reply('⚠️ पहले `n!setquarantine @role` সেট করুন!');
+        }
+
+        db.punishment = type;
+        await db.save();
+        return message.reply(`⚔️ **Novaa Config:** অ্যান্টি-নিউক পানিশমেন্ট সফলভাবে **${type.toUpperCase()}** সেট করা হয়েছে।`);
+    }
+
     if (command === 'setquarantine') {
-        if (!message.member.permissions.has('Administrator')) return message.reply('❌ Network clearance level: Administrator required.');
+        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return message.reply('❌ Admin required.');
         const role = message.mentions.roles.first();
-        if (!role) return message.reply('❌ **Usage Error:** Use `n!setquarantine @RoleName`');
-        try {
-            await Config.findOneAndUpdate({ guildId: message.guild.id }, { quarantineRoleId: role.id }, { upsert: true });
-            return message.reply(`✅ **Novaa Routing:** Quarantine lock target successfully linked to role: **${role.name}**.`);
-        } catch (e) { return message.reply('❌ Core error saving routing role.'); }
+        if (!role) return message.reply('❌ `n!setquarantine @RoleName`');
+        await Config.findOneAndUpdate({ guildId: message.guild.id }, { quarantineRoleId: role.id }, { upsert: true });
+        return message.reply(`✅ **Novaa Security:** কোয়ারেন্টাইন লক রোল সেভড: **${role.name}**.`);
     }
 
     if (command === 'antinuke') {
-        if (!message.member.permissions.has('Administrator')) return message.reply('❌ Administrator permissions required.');
+        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return message.reply('❌ Admin required.');
         const action = args[0]?.toLowerCase();
         if (action === 'enable') {
-            const serverConfig = await Config.findOne({ guildId: message.guild.id });
-            if (!serverConfig || !serverConfig.quarantineRoleId) return message.reply('⚠️ **Routing Blocked:** Please setup your quarantine role first using `n!setquarantine @role`');
-            serverConfig.antinukeEnabled = true; 
-            await serverConfig.save();
-            return message.reply('✅ **Novaa Routing:** Action routing for **antinuke** verified. Security Grid is now **ACTIVE**.');
+            db.antinukeEnabled = true; await db.save();
+            return message.reply(`🛡️ **Novaa Anti-Nuke:** সিকিউরিটি গ্রিড **ACTIVE**। পানিশমেন্ট মোড: **${db.punishment.toUpperCase()}**।`);
         } else if (action === 'disable') {
-            await Config.findOneAndUpdate({ guildId: message.guild.id }, { antinukeEnabled: false });
-            return message.reply('🛑 **Novaa Routing:** Antinuke core deactivated.');
-        } else { return message.reply('❌ System Usage: `n!antinuke enable` or `n!antinuke disable`'); }
+            db.antinukeEnabled = false; await db.save();
+            return message.reply('🛑 **Novaa Anti-Nuke:** অ্যান্টি-নিউক কোর নিষ্ক্রিয়।');
+        }
     }
 
-    if (command === 'nick') {
-        if (!message.member.permissions.has('ManageNicknames')) return message.reply('❌ This action requires Manage Nicknames permissions.');
-        const targetMember = message.mentions.members.first();
-        const nicknameString = args.slice(1).join(' ');
-        if (!targetMember || !nicknameString) return message.reply('❌ **Usage Error:** Use `n!nick @user New Name`');
-        try {
-            await targetMember.setNickname(nicknameString);
-            return message.reply(`✅ Successfully set nickname for **${targetMember.user.username}** to **${nicknameString}**.`);
-        } catch (e) { return message.reply('❌ Access denied. Check role hierarchy rules.'); }
+    if (command === 'antispam') {
+        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return message.reply('❌ Admin required.');
+        db.antispamEnabled = !db.antispamEnabled; await db.save();
+        return message.reply(`🔒 **Anti-Spam:** এখন এটি **${db.antispamEnabled ? 'चालू (ENABLED)' : 'বন্ধ (DISABLED)'}**।`);
     }
 
-    await runSystemModule(command, message);
+    if (command === 'antilink') {
+        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return message.reply('❌ Admin required.');
+        db.antilinkEnabled = !db.antilinkEnabled; await db.save();
+        return message.reply(`🔒 **Anti-Link:** এখন এটি **${db.antilinkEnabled ? 'চালু (ENABLED)' : 'বন্ধ (DISABLED)'}**।`);
+    }
+
+    if (command === 'help') {
+        const helpEmbed = new EmbedBuilder()
+            .setTitle('🌌 Novaa Advanced Security Panel')
+            .setColor('#2f3136')
+            .addFields(
+                { name: '🛡️ Anti-Nuke Settings', value: '`/setquarantine` - লক রোল সেট\n`/setpunishment` - শাস্তি নির্ধারণ (স্ল্যাশ কমান্ড)\n`n!antinuke enable/disable` - অ্যান্টি-নিউক অন/অফ' },
+                { name: '🔒 Chat Guard', value: '`n!antispam` - স্প্যাম গার্ড\n`n!antilink` - লিংক প্রটেকশন' }
+            );
+        return message.reply({ embeds: [helpEmbed] });
+    }
 });
 
-// ==================== SLASH ENGINE ====================
+// ==================== SLASH ENGINE PROCESSING ====================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     const { commandName, options, guildId, member } = interaction;
 
     if (commandName === 'setquarantine') {
-        if (!member.permissions.has('Administrator')) return interaction.reply({ content: '❌ Admin privileges required.', ephemeral: true });
+        if (!member.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admin required.', ephemeral: true });
         const targetRole = options.getRole('role');
-        try {
-            await Config.findOneAndUpdate({ guildId }, { quarantineRoleId: targetRole.id }, { upsert: true });
-            return interaction.reply(`✅ **Novaa Routing:** Quarantine lock target successfully linked to role: **${targetRole.name}**.`);
-        } catch (e) { return interaction.reply({ content: '❌ Fail save operations.', ephemeral: true }); }
+        await Config.findOneAndUpdate({ guildId }, { quarantineRoleId: targetRole.id }, { upsert: true });
+        return interaction.reply(`✅ **Novaa Security:** কোয়ারেন্টাইন রোল সেট করা হয়েছে: **${targetRole.name}**`);
     }
 
     if (commandName === 'antinuke') {
-        if (!member.permissions.has('Administrator')) return interaction.reply({ content: '❌ Admin privileges required.', ephemeral: true });
+        if (!member.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admin required.', ephemeral: true });
         const trigger = options.getString('status');
+        const dbData = await Config.findOneAndUpdate({ guildId }, {}, { upsert: true, new: true });
         if (trigger === 'enable') {
-            const dbData = await Config.findOne({ guildId });
-            if (!dbData || !dbData.quarantineRoleId) return interaction.reply({ content: '⚠️ Setup quarantine role first using `/setquarantine`', ephemeral: true });
-            dbData.antinukeEnabled = true; 
-            await dbData.save();
-            return interaction.reply('✅ **Novaa Routing:** Action routing for **antinuke** verified. Security Grid is now **ACTIVE**.');
+            if (!dbData.quarantineRoleId) return interaction.reply({ content: '⚠️ আগে রোল সেট করুন।', ephemeral: true });
+            dbData.antinukeEnabled = true; await dbData.save();
+            return interaction.reply(`🛡️ **Novaa Anti-Nuke:** সিকিউরিটি গ্রিড সচল। অ্যাকশন মোড: **${dbData.punishment.toUpperCase()}**।`);
         } else {
-            await Config.findOneAndUpdate({ guildId }, { antinukeEnabled: false });
-            return interaction.reply('🛑 **Novaa Routing:** Antinuke core deactivated.');
+            dbData.antinukeEnabled = false; await dbData.save();
+            return interaction.reply('🛑 **Novaa Anti-Nuke:** কোর নিষ্ক্রিয় করা হয়েছে।');
         }
     }
 
-    await runSystemModule(commandName, interaction);
+    // NEW: Slash Command for Punishment Setup
+    if (commandName === 'setpunishment') {
+        if (!member.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: '❌ Admin privileges required.', ephemeral: true });
+        const type = options.getString('type');
+        const dbData = await Config.findOneAndUpdate({ guildId }, {}, { upsert: true, new: true });
+
+        if (type === 'quarantine' && !dbData.quarantineRoleId) {
+            return interaction.reply({ content: '⚠️ **Routing Error:** কোয়ারেন্টাইন শাস্তি সেট করার আগে দয়া করে `/setquarantine` কমান্ড দিয়ে রোল সেট করে নিন!', ephemeral: true });
+        }
+
+        dbData.punishment = type;
+        await dbData.save();
+        
+        let displayType = type === 'ban' ? 'Direct Ban 🔨' : type === 'kick' ? 'Direct Kick 🥾' : 'Quarantine Role 🔒';
+        return interaction.reply(`⚔️ **Novaa Config:** অ্যান্টি-নিউক পানিশমেন্ট অ্যাকশন সফলভাবে **${displayType}** এ সেট করা হয়েছে।`);
+    }
 });
 
 // Safe Boot Mongoose
